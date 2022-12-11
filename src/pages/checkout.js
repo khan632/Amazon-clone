@@ -1,15 +1,41 @@
-import Image from "next/image";
-import { useSelector } from "react-redux";
 import CheckoutProduct from "../Components/CheckoutProduct";
 import Header from "../Components/Header";
 import { selectItems, selectTotal } from "../slices/basketSlice";
+
+import Image from "next/image";
+import axios from 'axios'
+import { useSelector } from "react-redux";
 import CurrencyFormat from "react-currency-format";
 import { useSession } from "next-auth/react";
+import { loadStripe } from '@stripe/stripe-js';
+// import { data } from "autoprefixer";
+const stripePromise = loadStripe(process.env.stripe_public_key);
 
 function checkout() {
   const items = useSelector(selectItems);
   const total = useSelector(selectTotal);
   const { data: session, status } = useSession();
+
+  const createCheckoutSession = async () => {
+      const stripe = await stripePromise;
+
+      // call the backend to create a checkout session
+      const checkOutSession = await axios.post('/api/create-checkout-session',
+        {
+          items: items,
+          email: session.user.email,
+        }
+      );
+      
+      // redirect to frontend
+      const result = await stripe.redirectToCheckout({
+        sessionId: checkOutSession.data.id,
+      })
+
+      if(result.error) alert(result.error.message);
+  }
+
+
   return (
     <div className="bg-gray-100">
       <Header />
@@ -60,6 +86,8 @@ function checkout() {
               </h2>
 
               <button
+                onClick={createCheckoutSession}
+                role="link"
                 disabled={status !== "authenticated"}
                 className={`button mt-5 ${
                   status !== "authenticated" &&
